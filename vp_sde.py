@@ -8,6 +8,7 @@ class VP_SDE:
         self.N = params['time_steps'] #N = 1000 in experiment
         self.dt = 1 / self.N
         self.sqrt_dt = torch.sqrt(self.dt)
+        self.T = 1
     
     def sde(self, x, t):
         r""""Returns the drift and diffusion of VP SDE"""
@@ -21,7 +22,8 @@ class VP_SDE:
     def perturbation_kernel(self, x0, t):
         r"""Returns the pertubation kernel p_{0t}(x(t) | x(0))"""
         int_beta = (self.beta_min * t + 0.5 * t**2 * (self.beta_max - self.beta_min))
-    
+        int_beta = int_beta.view(-1, 1, 1, 1)
+
         mean = torch.exp(-0.5 * int_beta) * x0
         var = 1 - torch.exp(-int_beta)
     
@@ -63,15 +65,13 @@ def score_function(model, sde):
 #Their loss function
 def get_loss_fn(sde, eps=1e-5):
     def loss_fn(model, batch):
-        score_fn = score_function(sde, model)
-
-        t = torch.rand(batch.shape[0], device=batch.device) * (sde.T - eps) + eps
+        score_fn = score_function(model, sde)
+        t = torch.rand(batch.shape[0], device=batch.device) * (1 - eps) + eps
         z = torch.randn_like(batch)
-        mean, std = sde.marginal_prob(batch, t)
-        perturbed_data = mean + std[:, None, None, None] * z
+        mean, std = sde.perturbation_kernel(batch, t)
+        perturbed_data = mean + std * z
         score = score_fn(perturbed_data, t)
-
-        losses = torch.square(score * std[:, None, None, None] + z)
+        losses = torch.square(score * std[:, None, None, None] + z) 
         losses = torch.mean(losses.reshape(losses.shape[0], -1), dim=-1)
         return torch.mean(losses)
     
