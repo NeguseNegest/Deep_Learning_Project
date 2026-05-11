@@ -8,3 +8,5 @@ torch.save({"ddpmpp" : vp_net.state_dict()
                   }, path + f"/bird_ddpmpp_ema_checkpoint_epoch_{epoch_str}.pth")
 
 To run, ...
+
+(can't upload file on github)
